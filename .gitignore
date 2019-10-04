@@ -1,0 +1,5 @@
+__pycache__/
+token.pickle
+token-for-google.json
+*.json
+.ipynb_checkpoints/
