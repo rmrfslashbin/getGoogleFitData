@@ -3,3 +3,6 @@ token.pickle
 token-for-google.json
 *.json
 .ipynb_checkpoints/
+node_modules/
+dist/
+data/

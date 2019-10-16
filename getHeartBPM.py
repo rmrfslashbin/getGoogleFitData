@@ -30,6 +30,22 @@ def search(creds, start, end):
 
     return bpm
 
+def clean(data):
+    points = []
+    for point in data["point"]:
+        points.append({
+            "timestamp": int(int(point["startTimeNanos"]) / 1000000),
+            "value": int(point["value"][0]["fpVal"])
+        })
+    return {"rawdata": {"points": points}}
+        
+def sma(data, window):
+    import pandas as pd
+    df = pd.DataFrame(data)
+    #df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms")
+    df.set_index("timestamp", inplace=True)
+    ma = df.value.rolling(window=window).mean().to_frame().dropna().to_dict()["value"]
+    return {"sma": {"window": window, "points": [{"timestamp": i, "value": ma[i]} for i in ma]}}
 
 if __name__ == '__main__':
     # Since the app is running, check the args
@@ -47,6 +63,8 @@ if __name__ == '__main__':
         help="Path to pickle containing google OAuth session (default= './token.pickle'")
     parser.add_argument("--start", type=str, required=True, help="Start Time")
     parser.add_argument("--end", type=str, required=True, help="End Time")
+    parser.add_argument("--sma", type=int, help="Simple moving average window (int)")
+
     parser.add_argument(
         "--output",
         "-o",
@@ -57,14 +75,21 @@ if __name__ == '__main__':
 
     # Do OAuth...
     creds = connect(SCOPES, args.google_token, args.auth_pickle)
+
     # Fetch data
-    data = search(creds, args.start, args.end)
+    data = clean(search(creds, args.start, args.end))
+
+    # if sma...
+    if args.sma:
+        smaData = sma(data["rawdata"]["points"], args.sma)
+        data = {**data, **smaData}
+
 
     # Write to output file if requested
     if args.output:
         with open(args.output, "w") as f:
             json.dump(data, f)
-            print(f"Wrote {len(data['point'])} points to {args.output}")
+            print(f"Wrote {len(data['rawdata']['points'])} points to {args.output}")
     # Otherwise, write to stdout
     else:
         print(json.dumps(data))
