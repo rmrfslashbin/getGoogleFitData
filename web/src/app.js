@@ -175,34 +175,6 @@ getData().then(data => {
         
         focus.select(".x-hover-line").attr("y2", height - yScale(d.value));
         focus.select(".y-hover-line").attr("x2", width + width);
-
-        d3.select(".mouseLine")
-        .attr("d", function(){
-          let yRange = yScale.range(); // range of y axis
-          let xCoor = d3.mouse(this)[0]; // mouse position in x
-          let xDate = xScale.invert(xCoor); // date corresponding to mouse x 
-          d3.selectAll('.mouseCircle') // for each circle group
-              .each(function(d,i){
-                 let rightIdx = bisect(dataset[1].values, xDate); // find date in data that right off mouse
-                 let interSect = get_line_intersection(xCoor,  // get the intersection of our vertical line and the data line
-                      yRange[0], 
-                      xCoor, 
-                      yRange[1],
-                      xScale(dataset[i].values[rightIdx-1].YEAR),
-                      yScale(dataset[i].values[rightIdx-1].VALUE),
-                      xScale(dataset[i].values[rightIdx].YEAR),
-                      yScale(dataset[i].values[rightIdx].VALUE));
-
-              d3.select(this) // move the circle to intersection
-                  .attr('transform', 'translate(' + interSect.x + ',' + interSect.y + ')');
-
-              d3.select(this.children[1]) // write coordinates out
-                  .text(xDate.toLocaleDateString() + "," + yScale.invert(interSect.y).toFixed(0));
-
-              });
-
-          return "M"+ xCoor +"," + yRange[0] + "L" + xCoor + "," + yRange[1]; // position vertical line
-      });
     }
 
 
