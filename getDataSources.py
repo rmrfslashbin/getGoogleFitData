@@ -4,11 +4,8 @@ import json
 from dateutil.parser import parse
 from googleapiclient.discovery import build
 from auth import connect
+from lib import scopes
 
-SCOPES = [
-    "https://www.googleapis.com/auth/fitness.activity.read",
-    "https://www.googleapis.com/auth/fitness.body.read"
-]
 
 
 def search(creds):
@@ -40,12 +37,12 @@ if __name__ == '__main__':
         help="Ouput json file")
     args = parser.parse_args()
 
-    creds = connect(SCOPES, args.google_token, args.auth_pickle)
+    creds = connect(scopes, args.google_token, args.auth_pickle)
     data = search(creds)
 
     if args.output:
         with open(args.output, "w") as f:
-            json.dump(data, f)
+            json.dump(data, f, indent=4)
             print(f"Wrote data to {args.output}")
     else:
-        print(json.dumps(data))
+        print(json.dumps(data, indent=4))

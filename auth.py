@@ -10,7 +10,10 @@ def connect(scopes, jsonToken, sessionPickle):
     # The file pickle stores the user's access and refresh tokens
     if os.path.exists(sessionPickle):
         with open(sessionPickle, 'rb') as token:
-            creds = pickle.load(token)
+            try:
+                creds = pickle.load(token)
+            except:
+                creds = None
     # If valid credentials are  available, start OAuth session
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
