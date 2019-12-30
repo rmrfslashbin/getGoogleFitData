@@ -2,6 +2,7 @@
 
 import json
 from dateutil.parser import parse
+from datetime import datetime
 from googleapiclient.discovery import build
 from auth import connect
 from lib import scopes
@@ -69,27 +70,39 @@ if __name__ == '__main__':
     dataTypeName = None
     dataSourceId = None
     
+    output = []
     if args.steps:
         dataTypeName = "com.google.step_count.delta",
         dataSourceId = "derived:com.google.step_count.delta:com.google.android.gms:estimated_steps"
+        data = search(creds, dataTypeName, dataSourceId, args.start, args.end)
+        for steps in data["bucket"][0]["dataset"][0]["point"]:
+            startTime = datetime.fromtimestamp(int(int(steps["startTimeNanos"]) / 1000000000))
+            endTime = datetime.fromtimestamp(int(int(steps["endTimeNanos"]) / 1000000000))
+            value = steps["value"][0]["intVal"]
+            output.append({
+                "timestamp": endTime.isoformat(),
+                "steps": value
+            })
+
+
+
    
     elif args.cals:
         dataTypeName = "com.google.calories.expended",
         dataSourceId = "derived:com.google.calories.expended:com.google.android.gms:merge_calories_expended"
+        data = search(creds, dataTypeName, dataSourceId, args.start, args.end)
 
     elif args.dist:
         dataTypeName = "com.google.distance.delta"
         dataSourceId = "derived:com.google.distance.delta:com.google.android.gms:merge_distance_delta"
-
-    # Fetch data
-    data = search(creds, dataTypeName, dataSourceId, args.start, args.end)
+        data = search(creds, dataTypeName, dataSourceId, args.start, args.end)
 
 
     # Write to output file if requested
     if args.output:
         with open(args.output, "w") as f:
-            json.dump(data, f)
+            json.dump(output, f)
             print(f"Wrote {len(data['rawdata']['points'])} points to {args.output}")
     # Otherwise, write to stdout
     else:
-        print(json.dumps(data, indent=4))
+        print(json.dumps(output, indent=4))
