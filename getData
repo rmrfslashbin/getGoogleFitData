@@ -60,6 +60,7 @@ if __name__ == '__main__':
     dataGroup.add_argument("--steps", action="store_true", help="Get steps")
     dataGroup.add_argument("--cals", action="store_true", help="Get calories (kcal)")
     dataGroup.add_argument("--dist", action="store_true", help="Get distance (meters)")
+    dataGroup.add_argument("--all", action="store_true", help="Get all data")
 
     args = parser.parse_args()
 
@@ -71,7 +72,7 @@ if __name__ == '__main__':
     dataSourceId = None
     
     output = []
-    if args.steps:
+    if args.steps or args.all:
         dataTypeName = "com.google.step_count.delta",
         dataSourceId = "derived:com.google.step_count.delta:com.google.android.gms:estimated_steps"
         data = search(creds, dataTypeName, dataSourceId, args.start, args.end)
@@ -80,22 +81,44 @@ if __name__ == '__main__':
             endTime = datetime.fromtimestamp(int(int(steps["endTimeNanos"]) / 1000000000))
             value = steps["value"][0]["intVal"]
             output.append({
-                "timestamp": endTime.isoformat(),
-                "steps": value
+                "steps": {
+                    "timestamp": endTime.isoformat(),
+                    "value": value,
+                    "unit": "int"
+                    }
             })
-
-
-
    
-    elif args.cals:
+    if args.cals or args.all:
         dataTypeName = "com.google.calories.expended",
         dataSourceId = "derived:com.google.calories.expended:com.google.android.gms:merge_calories_expended"
         data = search(creds, dataTypeName, dataSourceId, args.start, args.end)
+        for cals in data["bucket"][0]["dataset"][0]["point"]:
+            startTime = datetime.fromtimestamp(int(int(cals["startTimeNanos"]) / 1000000000))
+            endTime = datetime.fromtimestamp(int(int(cals["endTimeNanos"]) / 1000000000))
+            value = int(cals["value"][0]["fpVal"])
+            output.append({
+                "cals": {
+                    "timestamp": endTime.isoformat(),
+                    "value": value,
+                    "unit": "kcal"
+                    }
+            })
 
-    elif args.dist:
+    if args.dist or args.all:
         dataTypeName = "com.google.distance.delta"
         dataSourceId = "derived:com.google.distance.delta:com.google.android.gms:merge_distance_delta"
         data = search(creds, dataTypeName, dataSourceId, args.start, args.end)
+        for dist in data["bucket"][0]["dataset"][0]["point"]:
+            startTime = datetime.fromtimestamp(int(int(dist["startTimeNanos"]) / 1000000000))
+            endTime = datetime.fromtimestamp(int(int(dist["endTimeNanos"]) / 1000000000))
+            value = int(dist["value"][0]["fpVal"])
+            output.append({
+                "dist": {
+                    "timestamp": endTime.isoformat(),
+                    "value": value,
+                    "unit": "meters"
+                    }
+            })
 
 
     # Write to output file if requested
