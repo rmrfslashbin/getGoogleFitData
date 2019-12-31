@@ -6,6 +6,7 @@ from datetime import datetime
 from googleapiclient.discovery import build
 from auth import connect
 from lib import scopes
+from melog import MeLog
 
 
 def search(creds, dataTypeName, dataSourceId, start, end, bucketByTime = 86400000):
@@ -47,14 +48,11 @@ if __name__ == '__main__':
         type=str,
         default="./token.pickle",
         help="Path to pickle containing google OAuth session (default= './token.pickle'")
+    parser.add_argument("--melog", action="store_true", help="Post to MeLog")
+    parser.add_argument("--melogconfig", type=str, default="./config.json", help="Location of MeLog config file (default: ./config.json)")
+
     parser.add_argument("--start", type=str, required=True, help="Start Time")
     parser.add_argument("--end", type=str, required=True, help="End Time")
-    parser.add_argument(
-        "--output",
-        "-o",
-        type=str,
-        required=False,
-        help="Ouput json file")
 
     dataGroup = parser.add_mutually_exclusive_group(required=True)
     dataGroup.add_argument("--steps", action="store_true", help="Get steps")
@@ -121,11 +119,35 @@ if __name__ == '__main__':
             })
 
 
-    # Write to output file if requested
-    if args.output:
-        with open(args.output, "w") as f:
-            json.dump(output, f)
-            print(f"Wrote {len(data['rawdata']['points'])} points to {args.output}")
-    # Otherwise, write to stdout
+    if args.melog:
+        logs = MeLog(args.melogconfig)
+        tags = []
+        timestamp = None
+        for item in output:
+            tag = list(item)[0]
+            data = item[tag]["value"]
+            timestamp = item[tag]["timestamp"]
+            tags.append({
+              "tag": tag,
+              "data": data
+            })
+        tags.append({
+            "tag": "timestamp",
+            "data": timestamp
+        })
+        entry = {
+            "verb": "stats",
+            "tags": tags,
+            "note": "From getGoogleFitData",
+            "private": True,
+            "url": None,
+            "location": {
+                "lat": 0,
+                "lon": 0
+            }
+        }
+        r = logs.postNewLog(entry)
+        print("Logged to MeLog")
+        print(r.status_code, r.json())
     else:
         print(json.dumps(output, indent=4))
