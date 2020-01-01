@@ -2,7 +2,8 @@
 
 import json
 from dateutil.parser import parse
-from datetime import datetime
+from dateutil.relativedelta import relativedelta
+from datetime import datetime, date
 from googleapiclient.discovery import build
 from auth import connect
 from lib import scopes
@@ -12,13 +13,9 @@ from melog import MeLog
 def search(creds, dataTypeName, dataSourceId, start, end, bucketByTime = 86400000):
     googleFit = build('fitness', 'v1', credentials=creds)
 
-    # Start/End times
-    startTime = parse(start)
-    endTime = parse(end)
-
     # Convert to nanoseconds
-    startID = int(startTime.timestamp() * 1000.0)
-    endID = int(endTime.timestamp() * 1000.0)
+    startID = int(start.timestamp() * 1000.0)
+    endID = int(end.timestamp() * 1000.0)
 
     # Go get the data!
     data = googleFit.users().dataset().aggregate(
@@ -50,9 +47,12 @@ if __name__ == '__main__':
         help="Path to pickle containing google OAuth session (default= './token.pickle'")
     parser.add_argument("--melog", action="store_true", help="Post to MeLog")
     parser.add_argument("--melogconfig", type=str, default="./config.json", help="Location of MeLog config file (default: ./config.json)")
+    parser.add_argument("--end", type=str, help="End Time")
 
-    parser.add_argument("--start", type=str, required=True, help="Start Time")
-    parser.add_argument("--end", type=str, required=True, help="End Time")
+    dateGroup = parser.add_mutually_exclusive_group(required=True)
+    dateGroup.add_argument("--start", type=str, help="Start Time")
+    dateGroup.add_argument("--yesterday", action="store_true", help="Fetch data from yesterday")
+
 
     dataGroup = parser.add_mutually_exclusive_group(required=True)
     dataGroup.add_argument("--steps", action="store_true", help="Get steps")
@@ -68,12 +68,28 @@ if __name__ == '__main__':
     # Set up data source
     dataTypeName = None
     dataSourceId = None
-    
+
+    # Set up the start/end dates
+    startTime = None
+    endTime = None
+
+    if args.yesterday:
+        today = date.today()
+        startDate = today - relativedelta(days=+1, hour=00, minute=00, second=00)
+        endDate   = today - relativedelta(days=+1, hour=23, minute=59, second=59)
+    elif args.start:
+        startDate = parse(args.start)
+        endDate = parse(prgs.end)
+
+    if not endDate:
+        print("End date must be set")
+        raise SystemExit
+        
     output = []
     if args.steps or args.all:
         dataTypeName = "com.google.step_count.delta",
         dataSourceId = "derived:com.google.step_count.delta:com.google.android.gms:estimated_steps"
-        data = search(creds, dataTypeName, dataSourceId, args.start, args.end)
+        data = search(creds, dataTypeName, dataSourceId, startDate, endDate)
         for steps in data["bucket"][0]["dataset"][0]["point"]:
             startTime = datetime.fromtimestamp(int(int(steps["startTimeNanos"]) / 1000000000))
             endTime = datetime.fromtimestamp(int(int(steps["endTimeNanos"]) / 1000000000))
@@ -89,7 +105,7 @@ if __name__ == '__main__':
     if args.cals or args.all:
         dataTypeName = "com.google.calories.expended",
         dataSourceId = "derived:com.google.calories.expended:com.google.android.gms:merge_calories_expended"
-        data = search(creds, dataTypeName, dataSourceId, args.start, args.end)
+        data = search(creds, dataTypeName, dataSourceId, startDate, endDate)
         for cals in data["bucket"][0]["dataset"][0]["point"]:
             startTime = datetime.fromtimestamp(int(int(cals["startTimeNanos"]) / 1000000000))
             endTime = datetime.fromtimestamp(int(int(cals["endTimeNanos"]) / 1000000000))
@@ -105,7 +121,7 @@ if __name__ == '__main__':
     if args.dist or args.all:
         dataTypeName = "com.google.distance.delta"
         dataSourceId = "derived:com.google.distance.delta:com.google.android.gms:merge_distance_delta"
-        data = search(creds, dataTypeName, dataSourceId, args.start, args.end)
+        data = search(creds, dataTypeName, dataSourceId, startDate, endDate)
         for dist in data["bucket"][0]["dataset"][0]["point"]:
             startTime = datetime.fromtimestamp(int(int(dist["startTimeNanos"]) / 1000000000))
             endTime = datetime.fromtimestamp(int(int(dist["endTimeNanos"]) / 1000000000))
@@ -122,18 +138,19 @@ if __name__ == '__main__':
     if args.melog:
         logs = MeLog(args.melogconfig)
         tags = []
-        timestamp = None
+        timestamp = datetime(1970, 1, 1)
         for item in output:
             tag = list(item)[0]
             data = item[tag]["value"]
-            timestamp = item[tag]["timestamp"]
+            if parse(item[tag]["timestamp"]) > timestamp:
+                timestamp = parse(item[tag]["timestamp"])
             tags.append({
               "tag": tag,
               "data": data
             })
         tags.append({
             "tag": "timestamp",
-            "data": timestamp
+            "data": int(timestamp.timestamp() * 1000)
         })
         entry = {
             "verb": "stats",
