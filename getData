@@ -79,7 +79,7 @@ if __name__ == '__main__':
         endDate   = today - relativedelta(days=+1, hour=23, minute=59, second=59)
     elif args.start:
         startDate = parse(args.start)
-        endDate = parse(prgs.end)
+        endDate = parse(args.end)
 
     if not endDate:
         print("End date must be set")
